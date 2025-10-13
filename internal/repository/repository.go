@@ -3,7 +3,12 @@ package repository
 import (
 	"github.com/jmoiron/sqlx"
 	"tg-bot/internal/models"
-	"time"
+)
+
+const (
+	users  = "users"
+	events = "events"
+	stats  = "stats"
 )
 
 type Auth interface {
@@ -14,10 +19,14 @@ type Stats interface {
 	Save(stat models.Statistic) error
 }
 type Events interface {
-	Exists(title string) (bool, error)
-	DeleteOldEvents(now time.Time) error
-	AddEvent(e models.Event) error
-	GetRecentEvents(limit int) ([]models.Event, error)
+	Create(event models.Event, id int64) (int64, error)
+	GetEvents() ([]models.Event, error)
+	GetMyEvents(telegramID int64) ([]models.Event, error)
+	DeleteEvent(eventID, telegramID int64) error
+	SearchEvents(query string) ([]models.Event, error)
+	SearchEventRandom() (models.Event, error)
+	GetByID(id int64) (models.Event, error)
+	RequestJoin(eventID, telegramID int64) error
 }
 type Repository struct {
 	Auth

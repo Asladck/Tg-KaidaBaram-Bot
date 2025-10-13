@@ -1,4 +1,4 @@
-DROP TABLE IF EXISTS subscriptions;
-DROP TABLE IF EXISTS categories;
+DROP TABLE IF EXISTS statistics;
 DROP TABLE IF EXISTS users;
 DROP TABLE IF EXISTS events;
+DROP TABLE IF EXISTS event_participants;

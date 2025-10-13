@@ -34,7 +34,7 @@ func (r *AuthPostgres) GetUserById(id int64) (models.User, error) {
 	var user models.User
 	query := `SELECT id, telegram_id, username, chat_id 
 			  FROM users 
-			  WHERE id = $1`
+			  WHERE chat_id = $1`
 	err := r.db.Get(&user, query, id)
 	if err != nil {
 		return models.User{}, err
