@@ -13,20 +13,20 @@ const (
 
 type Auth interface {
 	Create(user models.User) (int64, error)
-	GetUserById(id int64) (models.User, error)
+	GetUserById(chatID int64) (models.User, error)
 }
 type Stats interface {
 	Save(stat models.Statistic) error
 }
 type Events interface {
-	Create(event models.Event, id int64) (int64, error)
+	Create(event models.Event, chatID int64) (int64, error)
 	GetEvents() ([]models.Event, error)
-	GetMyEvents(telegramID int64) ([]models.Event, error)
-	DeleteEvent(eventID, telegramID int64) error
+	GetMyEvents(chatID int64) ([]models.Event, error)
+	DeleteEvent(eventID, chatID int64) error
 	SearchEvents(query string) ([]models.Event, error)
 	SearchEventRandom() (models.Event, error)
 	GetByID(id int64) (models.Event, error)
-	RequestJoin(eventID, telegramID int64) error
+	RequestJoin(eventID, chatID int64) error
 }
 type Repository struct {
 	Auth

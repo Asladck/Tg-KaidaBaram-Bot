@@ -14,7 +14,7 @@ func NewEventPostgres(db *sqlx.DB) *EventPostgres {
 	return &EventPostgres{db: db}
 }
 
-func (r *EventPostgres) Create(event models.Event, telegramID int64) (int64, error) {
+func (r *EventPostgres) Create(event models.Event, chatID int64) (int64, error) {
 	tx, err := r.db.Beginx()
 	if err != nil {
 		return 0, err
@@ -27,18 +27,18 @@ func (r *EventPostgres) Create(event models.Event, telegramID int64) (int64, err
 		}
 	}()
 
-	// 1️⃣ Находим ID пользователя по telegram_id
+	// 1️⃣ Находим ID пользователя по chat_id
 	var userID int64
-	queryUser := `SELECT id FROM users WHERE telegram_id = $1`
-	err = tx.Get(&userID, queryUser, telegramID)
+	queryUser := `SELECT id FROM users WHERE chat_id = $1`
+	err = tx.Get(&userID, queryUser, chatID)
 	if err != nil {
-		return 0, fmt.Errorf("user with telegram_id=%d not found: %w", telegramID, err)
+		return 0, fmt.Errorf("user with chat_id=%d not found: %w", chatID, err)
 	}
 
 	// 2️⃣ Создаём событие
 	var eventID int64
 	queryEvent := `
-		INSERT INTO events (title, category, date, location, description, url, image_url, creator_id,creator_telegram_id, status, created_at, updated_at)
+		INSERT INTO events (title, category, date, location, description, url, image_url, creator_id, creator_chat_id, status, created_at, updated_at)
 		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'draft', NOW(), NOW())
 		RETURNING id
 	`
@@ -51,7 +51,7 @@ func (r *EventPostgres) Create(event models.Event, telegramID int64) (int64, err
 		event.URL,
 		event.ImageURL,
 		userID,
-		telegramID,
+		chatID,
 	).Scan(&eventID)
 	if err != nil {
 		return 0, err
@@ -70,23 +70,23 @@ func (r *EventPostgres) GetEvents() ([]models.Event, error) {
 	return eventsList, nil
 }
 
-func (r *EventPostgres) GetMyEvents(telegramID int64) ([]models.Event, error) {
+func (r *EventPostgres) GetMyEvents(chatID int64) ([]models.Event, error) {
 	var eventsList []models.Event
 
 	query := `
 		SELECT e.id, e.title, e.category, e.date, e.location, e.description, e.url, e.image_url, e.creator_id, e.created_at, e.updated_at, e.status
 		FROM events e
 		JOIN users u ON e.creator_id = u.id
-		WHERE u.telegram_id = $1
+		WHERE u.chat_id = $1
 		ORDER BY e.date
 	`
-	err := r.db.Select(&eventsList, query, telegramID)
+	err := r.db.Select(&eventsList, query, chatID)
 	if err != nil {
 		return nil, err
 	}
 	return eventsList, nil
 }
-func (r *EventPostgres) DeleteEvent(eventID, telegramID int64) error {
+func (r *EventPostgres) DeleteEvent(eventID, chatID int64) error {
 	tx, err := r.db.Beginx()
 	if err != nil {
 		return err
@@ -99,12 +99,12 @@ func (r *EventPostgres) DeleteEvent(eventID, telegramID int64) error {
 		}
 	}()
 
-	// 1️⃣ Находим ID пользователя по telegram_id
+	// 1️⃣ Находим ID пользователя по chat_id
 	var userID int64
-	queryUser := `SELECT id FROM users WHERE telegram_id = $1`
-	err = tx.Get(&userID, queryUser, telegramID)
+	queryUser := `SELECT id FROM users WHERE chat_id = $1`
+	err = tx.Get(&userID, queryUser, chatID)
 	if err != nil {
-		return fmt.Errorf("user with telegram_id=%d not found: %w", telegramID, err)
+		return fmt.Errorf("user with chat_id=%d not found: %w", chatID, err)
 	}
 
 	// 2️⃣ Удаляем событие, если оно принадлежит пользователю
@@ -119,7 +119,7 @@ func (r *EventPostgres) DeleteEvent(eventID, telegramID int64) error {
 		return err
 	}
 	if rowsAffected == 0 {
-		return fmt.Errorf("event with id=%d not found or does not belong to user with telegram_id=%d", eventID, telegramID)
+		return fmt.Errorf("event with id=%d not found or does not belong to user with chat_id=%d", eventID, chatID)
 	}
 
 	return nil
@@ -163,7 +163,7 @@ func (r *EventPostgres) GetByID(id int64) (models.Event, error) {
 	}
 	return event, nil
 }
-func (r *EventPostgres) RequestJoin(eventID, userTgID int64) error {
+func (r *EventPostgres) RequestJoin(eventID, chatID int64) error {
 	// Проверяем, существует ли событие
 	var exists bool
 	queryEvent := `SELECT EXISTS(SELECT 1 FROM events WHERE id = $1 AND date >= NOW())`
@@ -175,12 +175,12 @@ func (r *EventPostgres) RequestJoin(eventID, userTgID int64) error {
 		return fmt.Errorf("event with id=%d does not exist or has already occurred", eventID)
 	}
 
-	// Проверяем, существует ли пользователь
+	// Проверяем, существует ли пользователь по chat_id
 	var userID int64
-	queryUser := `SELECT id FROM users WHERE telegram_id = $1`
-	err = r.db.Get(&userID, queryUser, userTgID)
+	queryUser := `SELECT id FROM users WHERE chat_id = $1`
+	err = r.db.Get(&userID, queryUser, chatID)
 	if err != nil {
-		return fmt.Errorf("user with telegram_id=%d not found: %w", userTgID, err)
+		return fmt.Errorf("user with chat_id=%d not found: %w", chatID, err)
 	}
 
 	// Проверяем, не является ли пользователь создателем события
@@ -191,22 +191,22 @@ func (r *EventPostgres) RequestJoin(eventID, userTgID int64) error {
 		return err
 	}
 	if creatorID == userID {
-		return fmt.Errorf("user with telegram_id=%d is the creator of the event and cannot join it", userTgID)
+		return fmt.Errorf("user with chat_id=%d is the creator of the event and cannot join it", chatID)
 	}
 
 	// Проверяем, не отправлял ли пользователь уже заявку на это событие
 	var requestExists bool
-	queryRequest := `SELECT EXISTS(SELECT 1 FROM event_requests WHERE event_id = $1 AND user_id = $2)`
+	queryRequest := `SELECT EXISTS(SELECT 1 FROM event_participants WHERE event_id = $1 AND user_id = $2)`
 	err = r.db.Get(&requestExists, queryRequest, eventID, userID)
 	if err != nil {
 		return err
 	}
 	if requestExists {
-		return fmt.Errorf("user with telegram_id=%d has already requested to join event with id=%d", userTgID, eventID)
+		return fmt.Errorf("user with chat_id=%d has already requested to join event with id=%d", chatID, eventID)
 	}
 
 	// Сохраняем заявку на участие
-	queryInsert := `INSERT INTO event_requests (event_id, user_id, requested_at) VALUES ($1, $2, NOW())`
+	queryInsert := `INSERT INTO event_participants (event_id, user_id, requested_at) VALUES ($1, $2, NOW())`
 	_, err = r.db.Exec(queryInsert, eventID, userID)
 	if err != nil {
 		return err

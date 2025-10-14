@@ -17,12 +17,12 @@ type EventService struct {
 	broker  *rabbitmq.RabbitMQ
 }
 
-func NewEventService(repo repository.Events, rmq *rabbitmq.RabbitMQ) *EventService {
-	return &EventService{repo: repo, broker: rmq}
+func NewEventService(repo repository.Events, repAuth repository.Auth, rmq *rabbitmq.RabbitMQ) *EventService {
+	return &EventService{repo: repo, repAuth: repAuth, broker: rmq}
 }
 
-func (s *EventService) Create(event models.Event, telegramID int64) (int64, error) {
-	id, err := s.repo.Create(event, telegramID)
+func (s *EventService) Create(event models.Event, chatID int64) (int64, error) {
+	id, err := s.repo.Create(event, chatID)
 	if err != nil {
 		return 0, err
 	}
@@ -38,8 +38,8 @@ func (s *EventService) GetEvents() ([]models.Event, error) {
 	return events, nil
 }
 
-func (s *EventService) GetMyEvents(telegramID int64) ([]models.Event, error) {
-	events, err := s.repo.GetMyEvents(telegramID)
+func (s *EventService) GetMyEvents(chatID int64) ([]models.Event, error) {
+	events, err := s.repo.GetMyEvents(chatID)
 	if err != nil {
 		logrus.Infof("Error getting events: %s", err)
 		return nil, err
@@ -47,8 +47,8 @@ func (s *EventService) GetMyEvents(telegramID int64) ([]models.Event, error) {
 	return events, err
 }
 
-func (s *EventService) DeleteEvent(eventID, telegramID int64) error {
-	err := s.repo.DeleteEvent(eventID, telegramID)
+func (s *EventService) DeleteEvent(eventID, chatID int64) error {
+	err := s.repo.DeleteEvent(eventID, chatID)
 	if err != nil {
 		logrus.Infof("Error deleting event: %s", err)
 		return err
@@ -73,9 +73,9 @@ func (s *EventService) SearchEventRandom() (models.Event, error) {
 	}
 	return event, nil
 }
-func (s *EventService) RequestJoin(eventID, userTgID int64) error {
+func (s *EventService) RequestJoin(eventID, chatID int64) error {
 	// Проверяем и сохраняем заявку
-	if err := s.repo.RequestJoin(eventID, userTgID); err != nil {
+	if err := s.repo.RequestJoin(eventID, chatID); err != nil {
 		return err
 	}
 
@@ -86,12 +86,12 @@ func (s *EventService) RequestJoin(eventID, userTgID int64) error {
 	}
 
 	// Получаем данные участника
-	user, err := s.repAuth.GetUserById(userTgID)
+	user, err := s.repAuth.GetUserById(chatID)
 	if err != nil {
 		return fmt.Errorf("failed to get user: %w", err)
 	}
 
-	// Получаем создателя события
+	// Получаем создателя события (используем CreatorChatID)
 	creator, err := s.repAuth.GetUserById(event.CreatorTgID)
 	if err != nil {
 		return fmt.Errorf("failed to get event creator: %w", err)
@@ -106,8 +106,8 @@ func (s *EventService) RequestJoin(eventID, userTgID int64) error {
 	buttons := &telego.InlineKeyboardMarkup{
 		InlineKeyboard: [][]telego.InlineKeyboardButton{
 			{
-				{Text: "✅ Принять", CallbackData: fmt.Sprintf("approve_%d_%d", eventID, userTgID)},
-				{Text: "❌ Отклонить", CallbackData: fmt.Sprintf("reject_%d_%d", eventID, userTgID)},
+				{Text: "✅ Принять", CallbackData: fmt.Sprintf("approve_%d_%d", eventID, chatID)},
+				{Text: "❌ Отклонить", CallbackData: fmt.Sprintf("reject_%d_%d", eventID, chatID)},
 			},
 		},
 	}
@@ -128,7 +128,8 @@ func (s *EventService) RequestJoin(eventID, userTgID int64) error {
 		}
 	}
 
-	// Если используется брокер — дублируем уведомление
-
 	return nil
+}
+func (s *EventService) GetByID(id int64) (models.Event, error) {
+	return s.repo.GetByID(id)
 }

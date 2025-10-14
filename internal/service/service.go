@@ -11,13 +11,14 @@ type Auth interface {
 	GetUserById(id int64) (models.User, error)
 }
 type Events interface {
-	Create(event models.Event, telegramID int64) (int64, error)
+	Create(event models.Event, chatID int64) (int64, error)
 	GetEvents() ([]models.Event, error)
-	GetMyEvents(telegramID int64) ([]models.Event, error)
-	DeleteEvent(eventID, telegramID int64) error
+	GetMyEvents(chatID int64) ([]models.Event, error)
+	DeleteEvent(eventID, chatID int64) error
 	SearchEvents(query string) ([]models.Event, error)
 	SearchEventRandom() (models.Event, error)
-	RequestJoin(eventID, telegramID int64) error
+	RequestJoin(eventID, chatID int64) error
+	GetByID(id int64) (models.Event, error)
 }
 type Stats interface {
 	HandleEvent(body []byte) error
@@ -32,6 +33,6 @@ func NewService(rep *repository.Repository, rmq *rabbitmq.RabbitMQ) *Service {
 	return &Service{
 		Auth:   NewAuthService(rep.Auth, rmq),
 		Stats:  NewStatsService(rep.Stats),
-		Events: NewEventService(rep.Events, rmq),
+		Events: NewEventService(rep.Events, rep.Auth, rmq),
 	}
 }
